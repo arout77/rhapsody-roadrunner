@@ -5,7 +5,7 @@
     "license": "MIT",
     "require": {
         "php": ">=8.4.1",
-        "arout/rhapsody-core": "^1.0",
+        "arout/rhapsody-core": "^1.0 || dev-main",
         "spiral/roadrunner-http": "^3.3",
         "spiral/roadrunner-worker": "^3.4",
         "nyholm/psr7": "^1.8"
