@@ -1,2 +1,2 @@
 # rhapsody-roadrunner
-RoadRunner integration module for Rhapsody framework
+RoadRunner persistent-worker adapter for the Rhapsody framework.
