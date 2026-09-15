@@ -1,0 +1,63 @@
+<?php
+/**
+ * RoadRunner persistent worker entry point.
+ *
+ * Everything above the while() loop runs ONCE for the life of this worker
+ * process — the direct analog of bootstrap.php (boot-once) vs. index.php
+ * (per-request) under classic PHP, just kept alive across many requests
+ * instead of one.
+ *
+ * ErrorHandler::register() from index.php is deliberately NOT called here —
+ * see RoadRunnerKernel::handle()'s catch block for why.
+ */
+
+define('ROOT_DIR', dirname(__FILE__));
+
+require ROOT_DIR . '/vendor/autoload.php';
+require_once ROOT_DIR . '/vendor/arout/rhapsody-core/src/helpers.php';
+
+use Nyholm\Psr7\Factory\Psr17Factory;
+use Rhapsody\Core\Kernel;
+use Rhapsody\RoadRunner\RoadRunnerKernel;
+use Spiral\RoadRunner\Http\PSR7Worker;
+use Spiral\RoadRunner\Worker as RRWorker;
+
+// ---- BOOT ONCE ----
+$dotenv = Dotenv\Dotenv::createImmutable(ROOT_DIR);
+$dotenv->load();
+
+$config    = require ROOT_DIR . '/config/config.php';
+$container = require ROOT_DIR . '/vendor/arout/rhapsody-core/src/bootstrap.php';
+$kernel    = new Kernel($container, $config);
+
+// Registered once for the life of the worker. handleException()'s exit(1)
+// is a safety net of last resort for a Throwable that somehow escapes both
+// RoadRunnerKernel::handle()'s try/catch and this file's own loop — every
+// ordinary per-request error (404s, validation, etc.) is intercepted
+// before it ever reaches this. Also lets a true PHP engine fatal
+// (out-of-memory, etc.) end the worker cleanly rather than leave it in an
+// undefined state — RoadRunner's supervisor respawns it.
+\Rhapsody\Core\ErrorHandler::register($config);
+
+// So ErrorHandler::renderProductionError()'s existing container-Twig-reuse
+// path (checks $GLOBALS['container']) finds the same singleton Twig
+// instance instead of falling back to building an ad hoc one.
+$GLOBALS['container'] = $container;
+
+$psr17Factory     = new Psr17Factory();
+$roadRunnerKernel = new RoadRunnerKernel($kernel, $psr17Factory, ROOT_DIR);
+
+$worker     = RRWorker::create();
+$psr7Worker = new PSR7Worker($worker, $psr17Factory, $psr17Factory, $psr17Factory);
+
+// ---- PER REQUEST ----
+while ($psrRequest = $psr7Worker->waitRequest()) {
+    try {
+        $psr7Worker->respond($roadRunnerKernel->handle($psrRequest));
+    } catch (\Throwable $e) {
+        // A failure in the bridging itself (not a normal request exception,
+        // which RoadRunnerKernel::handle() already caught) — report it to
+        // RoadRunner rather than letting it kill the worker silently.
+        $psr7Worker->getWorker()->error((string) $e);
+    }
+}

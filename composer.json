@@ -1,0 +1,18 @@
+{
+    "name": "arout/rhapsody-roadrunner",
+    "description": "RoadRunner persistent-worker adapter for the Rhapsody framework.",
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": ">=8.4.1",
+        "arout/rhapsody-core": "^1.0",
+        "spiral/roadrunner-http": "^3.3",
+        "spiral/roadrunner-worker": "^3.4",
+        "nyholm/psr7": "^1.8"
+    },
+    "autoload": {
+        "psr-4": {
+            "Rhapsody\\RoadRunner\\": "src/"
+        }
+    }
+}
